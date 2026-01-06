@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>365夢想計劃 2026</title>
+<style>
+:root {
+--pink: #ffafbd; --yellow: #fde08d; --blue: #6dd5ed;
+--holiday-red: #e63946;
+--tag-pink: #ff007f; /* 桃紅色 */
+--gradient: linear-gradient(135deg, var(--pink) 0%, var(--yellow) 50%, var(--blue) 100%);
+}
+
+body { background-color: #f8f9fa; font-family: -apple-system, "PingFang TC", sans-serif; display: flex; flex-direction: column; align-items: center; padding: 10px; margin: 0; padding-bottom: 120px; }
+
+/* 頂部數據面板 */
+.dashboard {
+background: white; width: 95%; max-width: 600px; border-radius: 20px; padding: 15px;
+box-shadow: 0 10px 25px rgba(0,0,0,0.05); display: flex; flex-wrap: wrap; justify-content: space-around; gap: 10px; margin-bottom: 20px;
+border-top: 6px solid var(--blue); position: sticky; top: 10px; z-index: 100;
+}
+.stat-item { text-align: center; flex: 1; }
+.stat-label { font-size: 0.7rem; color: #888; }
+.stat-value { font-size: 1.1rem; font-weight: bold; color: #333; }
+
+/* 格子陣列 */
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; max-width: 1200px; }
+
+.card { background: white; border-radius: 12px; padding: 10px 5px; border: 1px solid #eee; position: relative; display: flex; flex-direction: column; align-items: center; transition: 0.3s; }
+.card.active { background: var(--gradient); border: none; box-shadow: 0 5px 15px rgba(255, 175, 189, 0.4); }
+
+/* 節慶標記 */
+.card.is-holiday .edit-date { color: var(--holiday-red) !important; font-weight: bold; }
+.holiday-label { color: var(--holiday-red); font-size: 0.6rem; font-weight: bold; position: absolute; top: 2px; right: 2px; background: rgba(230, 57, 70, 0.1); padding: 1px 3px; border-radius: 3px; }
+
+.edit-input { background: transparent; border: none; text-align: center; width: 100%; color: inherit; outline: none; margin: 1px 0; font-family: inherit; }
+.edit-date { font-size: 0.75rem; color: #777; }
+
+/* 桃紅色粗體標籤 */
+.edit-tag { font-size: 0.8rem; color: var(--tag-pink); font-weight: 900; }
+.edit-tag::placeholder { color: #ccc; font-weight: normal; }
+
+.edit-day { font-size: 0.65rem; color: var(--blue); font-weight: bold; }
+.money-input { font-size: 1.2rem; font-weight: 800; border-bottom: 1px dashed #ccc; width: 85%; color: #333; margin-top: 2px; }
+
+/* 啟動狀態文字變白 */
+.active * { color: white !important; }
+.active .holiday-label { background: rgba(255,255,255,0.2); }
+
+/* 按鈕群組 */
+.btn-group { position: fixed; bottom: 25px; display: flex; gap: 10px; z-index: 1000; }
+.action-btn { background: var(--gradient); color: white; border: none; padding: 12px 20px; border-radius: 50px; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.2); cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div class="dashboard">
+<div class="stat-item"><div class="stat-label">已存總額</div><div class="stat-value" id="total-val">$ 0</div></div>
+<div class="stat-item"><div class="stat-label">進度</div><div class="stat-value" id="progress-val">0 / 365</div></div>
+<div style="width:100%; text-align:center; font-size:0.8rem; border-top:1px solid #eee; padding-top:5px;">
+目標: <input type="number" id="goal-input" style="width:80px; border:1px solid #ddd; border-radius:4px;" oninput="saveGoal()">
+</div>
+</div>
+
+<div class="grid" id="main-grid"></div>
+
+<div class="btn-group">
+<button class="action-btn" onclick="addNewCard()">＋ 自定義欄位</button>
+<button class="action-btn" style="background:#333" onclick="exportData()">💾 備份</button>
+</div>
+
+<script>
+const holidays = {"1/1":"元旦","1/27":"調整","1/28":"除夕","1/29":"春節","1/30":"春節","1/31":"春節","2/1":"春節","2/2":"春節","2/27":"調整","2/28":"和平","4/3":"兒童節","4/4":"清明節","5/1":"勞動節","6/19":"端午節","9/25":"中秋節","10/9":"調整","10/10":"國慶日"};
+
+let moneyData = JSON.parse(localStorage.getItem('365_saved_m')) || {};
+let configData = JSON.parse(localStorage.getItem('365_saved_c')) || { goal: 0, texts: {}, extra: 0 };
+
+function updateStats() {
+let total = 0; let count = 0;
+Object.values(moneyData).forEach(v => { if(v > 0) { total += v; count++; } });
+document.getElementById('total-val').innerText = `$ ${total.toLocaleString()}`;
+document.getElementById('progress-val').innerText = `${count} / ${365 + configData.extra}`;
+}
+
+function saveGoal() {
+configData.goal = document.getElementById('goal-input').value;
+localStorage.setItem('365_saved_c', JSON.stringify(configData));
+}
+
+function createCard(i, isExtra = false) {
+const start = new Date(2026, 0, 1);
+const target = new Date(start); target.setDate(start.getDate() + (i - 1));
+const dateStr = `${target.getMonth() + 1}/${target.getDate()}`;
+const isH = !isExtra && (holidays[dateStr] || target.getDay() === 0 || target.getDay() === 6);
+
+const card = document.createElement('div');
+card.className = `card ${moneyData[i] > 0 ? 'active' : ''} ${isH ? 'is-holiday' : ''}`;
+card.id = `card-${i}`;
+
+card.innerHTML = `
+${(!isExtra && holidays[dateStr]) ? `<div class="holiday-label">${holidays[dateStr]}</div>` : ''}
+<input class="edit-input edit-date" value="${configData.texts[i]?.d || (isExtra ? '加碼' : '2026/'+dateStr)}" onchange="updateText(${i},'d',this.value)">
+<input class="edit-input edit-tag" placeholder="備註標籤" value="${configData.texts[i]?.t || ''}" onchange="updateText(${i},'t',this.value)">
+<input class="edit-input edit-day" value="${configData.texts[i]?.l || (isExtra ? 'EXTRA' : 'DAY '+i)}" onchange="updateText(${i},'l',this.value)">
+<input type="number" class="edit-input money-input" placeholder="0" value="${moneyData[i] || ''}" oninput="updateMoney(${i},this.value)">
+`;
+document.getElementById('main-grid').appendChild(card);
+}
+
+window.updateMoney = (id, val) => {
+if(val > 0) {
+moneyData[id] = parseFloat(val);
+document.getElementById(`card-${id}`).classList.add('active');
+} else {
+delete moneyData[id];
+document.getElementById(`card-${id}`).classList.remove('active');
+}
+localStorage.setItem('365_saved_m', JSON.stringify(moneyData));
+updateStats();
+};
+
+window.updateText = (id, type, val) => {
+if(!configData.texts[id]) configData.texts[id] = {};
+configData.texts[id][type] = val;
+localStorage.setItem('365_saved_c', JSON.stringify(configData));
+};
+
+window.addNewCard = () => {
+configData.extra++;
+createCard(365 + configData.extra, true);
+localStorage.setItem('365_saved_c', JSON.stringify(configData));
+updateStats();
+};
+
+window.exportData = () => {
+const data = btoa(encodeURIComponent(JSON.stringify({m: moneyData, c: configData})));
+prompt("您的數據備份代碼（請存入備忘錄）：", data);
+};
+
+// 初始化
+for (let i = 1; i <= 365; i++) createCard(i);
+for (let i = 1; i <= configData.extra; i++) createCard(365 + i, true);
+document.getElementById('goal-input').value = configData.goal || "";
+updateStats();
+</script>
+</body>
+</html>
